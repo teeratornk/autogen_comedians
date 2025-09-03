@@ -4,10 +4,10 @@ An interactive AI-powered improv comedy show featuring two comedian agents (Cath
 
 ## 📸 Screenshots
 
-![Improv Show Interface](assets/screenshot1.png)
+![Improv Show Interface](assets/Screenshot1.png)
 *Real-time improv performance with live scoring*
 
-![Show Analysis](assets/screenshot2.png)
+![Show Analysis](assets/Screenshot2.png)
 *Complete show analysis with scores and best lines*
 
 ## 🌟 Features
@@ -115,6 +115,163 @@ comedians/
    - Originality (0-3 points)
    - Punch impact (0-2 points)
 4. **Feedback Integration**: Comedians see their scores and adjust their performance
+
+### Agent Architecture (agents.py)
+
+The `agents.py` module defines how the AI agents are created and configured:
+
+#### Comedian Agents
+```python
+def make_comedian(name: str, llm_config: dict) -> ConversableAgent:
+```
+- **Purpose**: Creates improvising comedian agents (Cathy and Joe)
+- **System Message**: Defines their personality as "quick-witted, kind stand-up comedians"
+- **Rules**: 
+  - Keep responses to 2 sentences maximum
+  - Always connect to the audience suggestion
+  - Maintain clean, playful humor
+  - Can end scenes with "I gotta go"
+- **Termination**: Automatically detects when a scene should end (via termination phrases)
+
+#### Critic Agent
+```python
+def make_critic(llm_config: dict) -> ConversableAgent:
+```
+- **Purpose**: Evaluates comedian performances objectively
+- **Evaluation Rubric**:
+  - Relevance to suggestion (0-2 points)
+  - Setup to punch coherence (0-3 points) 
+  - Originality (0-3 points)
+  - Punch impact (0-2 points)
+- **Output Format**: Structured JSON with score, tags, and comments
+- **Configuration**: Uses the same LLM config as comedians (temperature setting removed for newer Azure models)
+
+Both agent types use AutoGen's `ConversableAgent` class with:
+- `human_input_mode="NEVER"` for fully autonomous operation
+- Custom termination predicates for scene control
+- Comprehensive error handling and logging
+
+### Show Orchestration (orchestration.py)
+
+The `orchestration.py` module manages the entire improv show flow and coordinates interactions between agents:
+
+#### Key Functions
+
+**1. `run_improv_streaming()`**
+- **Purpose**: Main orchestration function that runs the complete show
+- **Features**:
+  - Creates comedian and critic agents
+  - Manages turn-based performance
+  - Handles streaming callbacks for real-time UI updates
+  - Tracks feedback history for each comedian
+- **Flow**:
+  1. Initialize agents based on configuration
+  2. Determine starting order (Random/Cathy/Joe)
+  3. Execute rounds with alternating comedians
+  4. Store and pass critic feedback to comedians
+
+**2. `comedian_turn()`**
+- **Purpose**: Manages a single comedian's turn
+- **Inputs**:
+  - Current game state
+  - Partner's previous line (if any)
+  - Critic feedback from comedian's last turn
+- **Prompt Engineering**:
+  - Includes round number and total rounds
+  - Adds partner's line for context
+  - Incorporates critic feedback (score + comments)
+- **Termination**: Detects ending phrases ("I gotta go", "Goodbye")
+
+**3. `critic_judge_line()`**
+- **Purpose**: Evaluates a comedian's line
+- **Process**:
+  - Sends line to critic agent with suggestion context
+  - Parses JSON response into LineEval object
+  - Handles parse failures gracefully
+- **Output**: Structured evaluation with score, tags, and comments
+
+#### Feedback Loop Implementation
+
+```python
+# Track last feedback for each comedian
+last_feedback = {"Cathy": None, "Joe": None}
+
+# Pass feedback to comedian's next turn
+line, did_terminate = comedian_turn(
+    comedian, state, prior_line, round_idx, 
+    last_feedback.get(comedian.name)
+)
+```
+
+This creates an adaptive performance where comedians learn from critic feedback and adjust their style in subsequent rounds.
+
+#### Streaming Architecture
+
+The module supports two modes:
+- **Streaming**: Real-time updates via callbacks (`on_comedian_line`, `on_critic_eval`)
+- **Batch**: Traditional execution for backward compatibility
+
+### Streamlit Application (app.py)
+
+The `app.py` module is the main entry point that provides the interactive web interface using Streamlit:
+
+#### Key Features
+
+**1. Session State Management**
+```python
+if "show_state" not in st.session_state:
+    st.session_state.show_state = None
+if "streaming_state" not in st.session_state:
+    st.session_state.streaming_state = None
+if "is_running" not in st.session_state:
+    st.session_state.is_running = False
+```
+- **show_state**: Stores the complete show data after execution
+- **streaming_state**: Tracks real-time updates during performance
+- **is_running**: Prevents multiple simultaneous shows
+
+**2. Configuration Sidebar**
+- **Model Settings**: API key, endpoint, timeout, and seed configuration
+- **Show Settings**: Number of rounds and starting comedian selection
+- All settings are stored in session state for persistence
+
+**3. Real-time Streaming Implementation**
+
+The app uses callback functions to update the UI as the show progresses:
+
+```python
+def on_comedian_line(speaker: str, line: str, round_idx: int):
+    """Handle new comedian line"""
+    # Updates transcript in real-time
+    # Shows feedback indicator if comedian received critic notes
+    
+def on_critic_eval(eval: LineEval):
+    """Handle new critic evaluation"""
+    # Displays scores immediately after evaluation
+```
+
+**4. Visual Feedback**
+- **Feedback Indicator**: Shows "💭 *Considering critic feedback...*" when comedians incorporate previous criticism
+- **Score Display**: Real-time score updates with emojis (🎯)
+- **Progress Tracking**: Spinner during show execution
+- **Error Handling**: Detailed error information in expandable sections
+
+**5. Post-Show Analysis**
+After completion, the app displays:
+- Complete score breakdown table
+- Average scores bar chart
+- Best line highlight
+- JSON export functionality
+
+#### User Flow
+1. Configure settings in sidebar (or use defaults)
+2. Enter audience suggestion
+3. Click "Run Show" to start
+4. Watch real-time performance with streaming updates
+5. Review complete analysis after show ends
+6. Export results or reset for new show
+
+The streaming architecture ensures users see each comedian line and critic evaluation as it happens, creating an engaging, live-performance experience.
 
 ### Scoring System
 
