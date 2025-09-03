@@ -74,7 +74,7 @@ streamlit run app.py
 
 4. Click "Run Show" to start the performance
 
-![App Interface](assets/screenshot1.png)
+![App Interface](assets/Screenshot1.png)
 
 5. Watch as:
    - Comedians take turns performing
@@ -82,7 +82,7 @@ streamlit run app.py
    - Scores and feedback appear in real-time
    - Comedians adapt based on critic feedback
 
-![Performance Analysis](assets/screenshot2.png)
+![Performance Analysis](assets/Screenshot2.png)
 
 ## 🏗️ Project Structure
 
